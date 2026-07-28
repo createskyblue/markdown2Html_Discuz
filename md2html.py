@@ -253,7 +253,7 @@ def convert(
         output_path = input_path.with_suffix('.html')
 
     output_path.write_text(result, encoding='utf-8')
-    print(f"✅ 已生成: {output_path}")
+    print(f"已生成: {output_path}")
 
     return result
 
