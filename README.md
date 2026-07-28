@@ -22,10 +22,10 @@ python md2html.py article.md --strip-front -o output.html
 本 README 本身也是 Markdown 写的，可直接转换自身作为示例：
 
 ```bash
-python md2html.py README.md -o README.html
+python md2html.py README.md -o example/README.html
 ```
 
-生成的 `README.html` 是一个完整的功能演示，涵盖标题、代码块、行内高亮、表格等所有特性。
+生成的 `example/README.html` 是一个完整的功能演示，涵盖标题、代码块、行内高亮、表格等所有特性。
 
 ## 命令行选项
 
