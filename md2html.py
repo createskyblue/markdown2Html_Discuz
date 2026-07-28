@@ -147,7 +147,6 @@ def convert(
     input_path: Path,
     output_path: Path | None = None,
     *,
-    strip_front: bool = False,
     body_only: bool = False,
     code_separator: bool = False,
 ) -> str:
@@ -168,8 +167,8 @@ def convert(
         HeadingBrExtension(),               # 标题前加 <br>
     ]
 
-    if strip_front:
-        extensions.append(StripFrontMatterExtension())
+    # 自动检测并剥离 YAML front matter
+    extensions.append(StripFrontMatterExtension())
 
     # 扩展配置：代码高亮不注入 Pygments CSS
     extension_configs = {
@@ -294,14 +293,12 @@ def main(argv: list[str] | None = None) -> None:
 
     parser.add_argument('input', type=Path, help='输入的 Markdown 文件路径')
     parser.add_argument('-o', '--output', type=Path, default=None, help='输出 HTML 文件路径（默认同目录同名 .html）')
-    parser.add_argument('--strip-front', action='store_true', help='去掉 YAML front matter (--- 之间内容)')
     parser.add_argument('--body-only', action='store_true', help='只输出 body 内部 HTML，不生成 `<html>` `<head>` 等外层结构')
     parser.add_argument('--code-separator', action='store_true', help='代码块使用经典手动分隔符模式（默认用纯 div+blockquote）')
 
     args = parser.parse_args(argv)
     convert(
         args.input, args.output,
-        strip_front=args.strip_front,
         body_only=args.body_only,
         code_separator=args.code_separator,
     )

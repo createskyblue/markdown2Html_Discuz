@@ -8,9 +8,8 @@ Markdown → 纯 HTML，直接贴进 Discuz! 论坛编辑器。
 
 ```bash
 pip install markdown
-python md2html.py article.md                      # 基础转换
-python md2html.py article.md --strip-front        # 去掉 YAML 头
-python md2html.py README.md -o example/README.html # 本项目自举示例
+python md2html.py article.md                         # 基础转换
+python md2html.py README.md -o example/README.html    # 本项目自举示例
 ```
 
 ## 选项
@@ -18,7 +17,6 @@ python md2html.py README.md -o example/README.html # 本项目自举示例
 | 参数 | 作用 |
 |------|------|
 | `-o, --output` | 输出路径（默认同名 `.html`） |
-| `--strip-front` | 去掉 `---` YAML front matter |
 | `--body-only` | 只输出 body 内容 |
 | `--code-separator` | 代码块用 `----` 分隔符模式 |
 

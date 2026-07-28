@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 index.md
 index.html
+build/
+dist/
+*.spec
