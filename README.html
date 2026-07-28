@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>md2html — Markdown 转 Discuz! 兼容 HTML</title>
+</head>
+<body>
+<b><font size="5">md2html — Markdown 转 Discuz! 兼容 HTML</font></b>
+<p>将 Markdown 文件转换为无 CSS 依赖的纯 HTML，输出的 HTML 可直接粘贴到 <strong>Discuz! 论坛编辑器</strong>（纯文本模式）中使用。</p>
+<br>
+<p><img alt="示例" src="img/PixPin_2026-07-28_13-17-18.jpg"></p>
+<br>
+<br>
+<br>
+<b><font size="4">快速开始</font></b>
+<div class="blockcode">
+<blockquote># 安装依赖<br>
+pip install markdown<br>
+<br>
+# 基础转换<br>
+python md2html.py article.md<br>
+<br>
+# 去掉 YAML front matter，指定输出路径<br>
+python md2html.py article.md --strip-front -o output.html</blockquote>
+</div>
+
+<br>
+<br>
+<b><font size="3">自举转换</font></b>
+<p>本 README 本身也是 Markdown 写的，可直接转换自身作为示例：</p>
+
+<div class="blockcode">
+<blockquote>python md2html.py README.md -o README.html</blockquote>
+</div>
+
+<p>生成的 <font color="#FF2643"><font style="background-color:#FFF0F2">README.html</font></font> 是一个完整的功能演示，涵盖标题、代码块、行内高亮、表格等所有特性。</p>
+<br>
+<br>
+<br>
+<b><font size="4">命令行选项</font></b>
+<table>
+<tbody>
+
+<tr>
+<th><b>参数</b></th>
+<th><b>说明</b></th>
+</tr>
+
+
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">input</font></font></td>
+<td>输入的 Markdown 文件路径</td>
+</tr>
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">-o, --output</font></font></td>
+<td>输出路径（默认同目录同名 <font color="#FF2643"><font style="background-color:#FFF0F2">.html</font></font>）</td>
+</tr>
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">--strip-front</font></font></td>
+<td>去掉 YAML front matter（<font color="#FF2643"><font style="background-color:#FFF0F2">---</font></font> 包裹的元数据）</td>
+</tr>
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">--body-only</font></font></td>
+<td>只输出 body 内部 HTML，不含 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;html&gt;</font></font> / <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;head&gt;</font></font> 外层</td>
+</tr>
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">--code-separator</font></font></td>
+<td>代码块使用经典 <font color="#FF2643"><font style="background-color:#FFF0F2">----</font></font> 分隔符模式</td>
+</tr>
+
+</tbody>
+</table>
+<br>
+<br>
+<b><font size="4">输出特性</font></b>
+<br>
+<br>
+<b><font size="3">标题</font></b>
+<p><font color="#FF2643"><font style="background-color:#FFF0F2">h1</font></font> → <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;b&gt;&lt;font size="5"&gt;</font></font>，<font color="#FF2643"><font style="background-color:#FFF0F2">h2</font></font> → <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;font size="4"&gt;</font></font>，以此类推。首个标题前不额外换行，后续标题前自动插入 2 个 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;br&gt;</font></font> 拉开章节间距。</p>
+<br>
+<br>
+<br>
+<b><font size="3">代码块（两种模式）</font></b>
+<p><strong>默认现代模式</strong>（推荐）：</p>
+
+<div class="blockcode">
+<blockquote>&lt;div class=&quot;blockcode&quot;&gt;<br>
+&lt;blockquote&gt;缩进保留的代码行&lt;br&gt;<br>
+下一行&lt;/blockquote&gt;<br>
+&lt;/div&gt;</blockquote>
+</div>
+
+<ul>
+<li>Tab 自动转空格，<font color="#FF2643"><font style="background-color:#FFF0F2">&amp;nbsp;</font></font> 保留缩进</li>
+<li>最后一行无多余 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;br&gt;</font></font></li>
+</ul>
+<p><strong>经典分隔符模式</strong>（<font color="#FF2643"><font style="background-color:#FFF0F2">--code-separator</font></font>）：</p>
+
+<div class="blockcode">
+<blockquote>--------------------------------------------------------------------------------<br>
+&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;div class=&quot;blockcode&quot;&gt;代码内容&lt;/div&gt;<br>
+--------------------------------------------------------------------------------&lt;br&gt;</blockquote>
+</div>
+
+<p>80 字符 <font color="#FF2643"><font style="background-color:#FFF0F2">-</font></font> 分隔线包裹，与 Discuz! <font color="#FF2643"><font style="background-color:#FFF0F2">[​code​]</font></font> 标签风格一致。</p>
+<br>
+<br>
+<br>
+<b><font size="3">行内代码</font></b>
+<p><font color="#FF2643"><font style="background-color:#FFF0F2">`inline code`</font></font> → 粉底红字高亮：</p>
+
+<div class="blockcode">
+<blockquote>&lt;font color=&quot;#FF2643&quot;&gt;&lt;font style=&quot;background-color:#FFF0F2&quot;&gt;text&lt;/font&gt;&lt;/font&gt;</blockquote>
+</div>
+
+<br>
+<br>
+<b><font size="3">表格</font></b>
+<p><font color="#FF2643"><font style="background-color:#FFF0F2">&lt;thead&gt;</font></font> / <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;tbody&gt;</font></font> 合并为统一 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;tbody&gt;</font></font>，表头 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;th&gt;</font></font> 自动加 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;b&gt;</font></font> 粗体。</p>
+<br>
+<br>
+<br>
+<b><font size="3">段落间距</font></b>
+<p>每个 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;/p&gt;</font></font> 后插入一个 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;br&gt;</font></font> 保证段落间距；代码块前自动去掉多余 <font color="#FF2643"><font style="background-color:#FFF0F2">&lt;br&gt;</font></font> 使内容区紧贴。</p>
+<br>
+<br>
+<br>
+<b><font size="3">编译时间戳</font></b>
+<p>每篇文章末尾自动附加：</p>
+
+<div class="blockcode">
+<blockquote>&lt;hr&gt;<br>
+&lt;p&gt;build 28 July 2026 13:00 (UTC+8)&lt;/p&gt;</blockquote>
+</div>
+
+<p><font color="#FF2643"><font style="background-color:#FFF0F2">--body-only</font></font> 模式不输出时间戳。</p>
+<br>
+<br>
+<br>
+<b><font size="4">Markdown 编写建议</font></b>
+<ol>
+<li><strong>元数据</strong> 用 YAML front matter，配合 <font color="#FF2643"><font style="background-color:#FFF0F2">--strip-front</font></font> 转换时自动移除</li>
+<li><strong>代码块</strong> 用 <font color="#FF2643"><font style="background-color:#FFF0F2">```lang</font></font> 围栏语法，指定语言可获得语法标注</li>
+<li><strong>图片</strong> 使用相对路径，上传时将图片一并提交到论坛</li>
+<li><strong>表格</strong> 标准 GFM 表格语法，支持 <font color="#FF2643"><font style="background-color:#FFF0F2">[​TOC​]</font></font> 目录占位符</li>
+</ol>
+<br>
+<br>
+<b><font size="4">适用场景</font></b>
+<ul>
+<li>技术博客 → Discuz! 论坛发帖</li>
+<li>Markdown 笔记 → 论坛编辑器粘贴</li>
+<li>批量文档格式迁移</li>
+</ul>
+<br>
+<br>
+<b><font size="4">依赖</font></b>
+<ul>
+<li>Python 3.9+</li>
+<li><a href="https://python-markdown.github.io/">Python-Markdown</a> ≥ 3.0</li>
+</ul>
+<br>
+<br>
+<hr>
+<p>build 28 July 2026 13:35 (UTC+8)</p>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用 pyOCD 与 Cortex-Debug 在挂机异常后连接 MCU 查看现场</title>
+</head>
+<body>
+<b><font size="5">用 pyOCD 与 Cortex-Debug 在挂机异常后连接 MCU 查看现场</font></b>
+<p>几十台产品需要长期挂机，异常可能数小时或数天后出现。每台一直挂调试器不现实，启动调试还可能复位目标。设备平时独立运行，出现停转、卡死或状态异常后，再通过 SWD 暂停 MCU 查看现场。</p>
+<br>
+<p><img alt="Vscode_Cortex_Debug断点调试" src="./PixPin_2026-07-28_11-56-24.jpg"></p>
+<br>
+<br>
+<br>
+<b><font size="4">Reset 与现场边界</font></b>
+<p>常规 Launch 调试会让程序从复位入口重新开始：</p>
+
+<div class="blockcode">
+<blockquote>Reset -&gt; Reset_Handler -&gt; SystemInit -&gt; main</blockquote>
+</div>
+
+<p>现场连接需要保留当前执行位置：</p>
+
+<div class="blockcode">
+<blockquote>异常位置 -&gt; SWD 连接 -&gt; Debug Halt -&gt; 读取 CPU 状态</blockquote>
+</div>
+
+<p>一旦执行 Reset，<font color="#FF2643"><font style="background-color:#FFF0F2">PC</font></font>、<font color="#FF2643"><font style="background-color:#FFF0F2">SP</font></font>、调用栈和外设状态都会发生变化，故障现场也随之改变。</p>
+<br>
+<p>目标中的固件与本地 ELF 必须来自同一次构建。<font color="#FF2643"><font style="background-color:#FFF0F2">executable</font></font> 只用于加载 ELF 符号，把地址映射到函数、源码和变量；现场调试不要执行 GDB 的 <font color="#FF2643"><font style="background-color:#FFF0F2">load</font></font> 命令。<font color="#FF2643"><font style="background-color:#FFF0F2">load</font></font> 会进入 Flash 编程流程，可能执行擦除、写入或复位，直接改变现场。ELF 与设备固件不一致时，调用栈和变量显示可能失真。</p>
+<br>
+<p>这套方法保存的是“调试器暂停 MCU 那一刻”的状态。若看门狗已经复位设备，或程序继续运行并覆盖了故障栈，原始现场无法靠延迟连接恢复。</p>
+<br>
+<br>
+<br>
+<b><font size="4">Cortex-Debug Attach 配置</font></b>
+<p>Cortex-Debug 应使用 <font color="#FF2643"><font style="background-color:#FFF0F2">request: "attach"</font></font>。它跳过 Launch 模式默认的下载和启动流程，不会主动把设备重新运行到 <font color="#FF2643"><font style="background-color:#FFF0F2">main</font></font>。自定义 GDB 命令、启动脚本和 GDB Server 仍可能触发 Reset，使用前需要逐项检查。</p>
+
+<div class="blockcode">
+<blockquote>{<br>
+&nbsp;&nbsp;&quot;name&quot;: &quot;MCU Attach (pyOCD)&quot;,<br>
+&nbsp;&nbsp;&quot;type&quot;: &quot;cortex-debug&quot;,<br>
+&nbsp;&nbsp;&quot;request&quot;: &quot;attach&quot;,<br>
+&nbsp;&nbsp;&quot;cwd&quot;: &quot;${workspaceFolder}&quot;,<br>
+&nbsp;&nbsp;&quot;servertype&quot;: &quot;pyocd&quot;,<br>
+&nbsp;&nbsp;&quot;targetId&quot;: &quot;TARGET_ID&quot;,<br>
+&nbsp;&nbsp;&quot;executable&quot;: &quot;./build/firmware.elf&quot;,<br>
+&nbsp;&nbsp;&quot;cmsisPack&quot;: &quot;./pack/Vendor.Device.pack&quot;,<br>
+&nbsp;&nbsp;&quot;svdFile&quot;: &quot;./svd/device.svd&quot;,<br>
+&nbsp;&nbsp;&quot;serverArgs&quot;: [​<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&quot;-O&quot;,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&quot;connect_mode=attach&quot;<br>
+&nbsp;&nbsp;​],<br>
+&nbsp;&nbsp;&quot;overrideGDBServerStartedRegex&quot;: &quot;GDB server listening on port&quot;<br>
+}</blockquote>
+</div>
+
+<p>当前版本的 Cortex-Debug 无法识别新版 pyOCD 的启动输出，需要用 <font color="#FF2643"><font style="background-color:#FFF0F2">overrideGDBServerStartedRegex</font></font> 指定成功日志。否则 pyOCD 已监听端口，Cortex-Debug 仍可能停在等待启动。</p>
+<br>
+<p>异常出现后，在 VS Code 中启动这项配置。<font color="#FF2643"><font style="background-color:#FFF0F2">connect_mode=attach</font></font> 只控制 pyOCD 初始化阶段，此时 pyOCD 不主动暂停 CPU。</p>
+<br>
+<p>本机 pyOCD 0.44.1 会在 GDB 接入时调用 <font color="#FF2643"><font style="background-color:#FFF0F2">halt()</font></font>，所以此版本冻结点位于 GDB 连接阶段；其他版本请以启动日志为准。</p>
+<br>
+<br>
+<br>
+<b><font size="4">Attach 与 Halt 的冻结时机</font></b>
+<p>状态仍在快速变化时，等待 GDB 完成连接可能太晚。把连接模式改成 <font color="#FF2643"><font style="background-color:#FFF0F2">halt</font></font>，pyOCD 会在 GDB Server 初始化期间暂停内核。</p>
+
+<div class="blockcode">
+<blockquote>&quot;serverArgs&quot;: [​<br>
+&nbsp;&nbsp;&quot;-O&quot;,<br>
+&nbsp;&nbsp;&quot;connect_mode=halt&quot;<br>
+​],<br>
+&quot;overrideGDBServerStartedRegex&quot;: &quot;GDB server listening on port&quot;</blockquote>
+</div>
+
+<p>暂停由 Cortex-M 调试硬件完成，CPU 无需运行到某个暂停函数。概念链路如下：</p>
+
+<div class="blockcode">
+<blockquote>SWD -&gt; DAP -&gt; DHCSR.C_HALT -&gt; CPU 停止</blockquote>
+</div>
+
+<p>两种模式都配合 Cortex-Debug 的 <font color="#FF2643"><font style="background-color:#FFF0F2">request: "attach"</font></font> 使用：</p>
+<br>
+<table>
+<tbody>
+
+<tr>
+<th><b>pyOCD 模式</b></th>
+<th><b>暂停时机</b></th>
+<th><b>使用场景</b></th>
+</tr>
+
+
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">attach</font></font></td>
+<td>GDB 客户端接入时</td>
+<td>状态稳定</td>
+</tr>
+<tr>
+<td><font color="#FF2643"><font style="background-color:#FFF0F2">halt</font></font></td>
+<td>pyOCD 连接目标时</td>
+<td>状态变化快</td>
+</tr>
+
+</tbody>
+</table>
+<br>
+<br>
+<b><font size="4">独立 GDB Server 提前冻结</font></b>
+<p>需要先冻结、后打开 VS Code 时，可以运行一次性脚本。它用 <font color="#FF2643"><font style="background-color:#FFF0F2">halt</font></font> 启动 pyOCD GDB Server，冻结 MCU 后等待 GDB 接入。</p>
+
+<div class="blockcode">
+<blockquote>@echo off<br>
+pyocd gdbserver --pack .\pack\Vendor.Device.pack -t TARGET_ID -O connect_mode=halt<br>
+pause</blockquote>
+</div>
+
+<p>VS Code 使用外部 GDB Server，并继续采用 <font color="#FF2643"><font style="background-color:#FFF0F2">request: "attach"</font></font>：</p>
+
+<div class="blockcode">
+<blockquote>{<br>
+&nbsp;&nbsp;&quot;name&quot;: &quot;MCU External Attach&quot;,<br>
+&nbsp;&nbsp;&quot;type&quot;: &quot;cortex-debug&quot;,<br>
+&nbsp;&nbsp;&quot;request&quot;: &quot;attach&quot;,<br>
+&nbsp;&nbsp;&quot;servertype&quot;: &quot;external&quot;,<br>
+&nbsp;&nbsp;&quot;gdbTarget&quot;: &quot;localhost:3333&quot;,<br>
+&nbsp;&nbsp;&quot;executable&quot;: &quot;./build/firmware.elf&quot;,<br>
+&nbsp;&nbsp;&quot;svdFile&quot;: &quot;./svd/device.svd&quot;<br>
+}</blockquote>
+</div>
+
+<p>脚本只启动一次。参数错误或 GDB Server 退出后，<font color="#FF2643"><font style="background-color:#FFF0F2">pause</font></font> 会保留错误信息，避免快速重复启动 pyOCD。</p>
+<br>
+<p>几十台设备可以继续独立挂机，调试探针只接到发生异常的设备上。<font color="#FF2643"><font style="background-color:#FFF0F2">halt</font></font> 负责尽早冻结，Cortex-Debug 负责把寄存器、源码和变量组织成可读现场。</p>
+<br>
+<br>
+<br>
+<hr>
+<p>build 28 July 2026 13:29 (UTC+8)</p>
+</body>
+</html>
