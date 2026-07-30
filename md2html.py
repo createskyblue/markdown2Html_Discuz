@@ -123,6 +123,46 @@ class HeadingBrExtension(Extension):
 # YAML front matter 剥离
 # ---------------------------------------------------------------------------
 
+class OrderedListToTextPreprocessor(Preprocessor):
+    """把有序列表的数字转义为纯文本，保留原始编号，项之间插入空行防止合并"""
+
+    def run(self, lines):
+        result = []
+        in_fence = False
+        prev_was_ol = False
+        for line in lines:
+            stripped = line.strip()
+            # 追踪围栏代码块
+            if stripped.startswith('```'):
+                in_fence = not in_fence
+                result.append(line)
+                prev_was_ol = False
+                continue
+            if in_fence:
+                result.append(line)
+                prev_was_ol = False
+                continue
+            # 检测是否有序列表项
+            is_ol = bool(re.match(r'^\d+\.\s', line))
+            if is_ol:
+                # 与前一个列表项之间加空行，防止合并到同一个 <p>
+                if prev_was_ol and result and result[-1] != '':
+                    result.append('')
+                result.append(re.sub(r'^(\d+)\.(\s)', r'\1\\.\2', line))
+                prev_was_ol = True
+            else:
+                # 空行不重置 prev_was_ol，保持列表项之间的连续性
+                if stripped != '':
+                    prev_was_ol = False
+                result.append(line)
+        return result
+
+
+class OrderedListToTextExtension(Extension):
+    def extendMarkdown(self, md):
+        md.preprocessors.register(OrderedListToTextPreprocessor(md), 'ol_to_text', 105)
+
+
 class StripFrontMatterPreprocessor(Preprocessor):
     """去掉 `--- ... ---` 包裹的 YAML front matter"""
 
@@ -163,6 +203,7 @@ def convert(
         'codehilite',           # 代码高亮（只生成 class，不加 CSS）
         'tables',               # GFM 表格
         'toc',                  # [TOC] 目录
+        OrderedListToTextExtension(),         # 有序列表 → 纯文本编号
         CodeBlockToBlockquoteExtension(use_separator=code_separator),
         HeadingBrExtension(),               # 标题前加 <br>
     ]
@@ -281,27 +322,73 @@ def _escape_html(text: str) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description='Markdown → 无样式 HTML',
+        description='Markdown → 无样式 HTML（支持拖拽文件到 exe 上自动转换）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   python md2html.py readme.md
   python md2html.py readme.md -o docs/readme.html
   python md2html.py blog.md --strip-front --body-only
+
+拖拽使用:
+  直接把 .md 文件拖到 md2html.exe 图标上即可自动转换，
+  输出文件在同目录生成，窗口处理完后会等待按键关闭。
         """.strip(),
     )
 
-    parser.add_argument('input', type=Path, help='输入的 Markdown 文件路径')
+    parser.add_argument('input', type=Path, nargs='?', default=None, help='输入的 Markdown 文件路径')
     parser.add_argument('-o', '--output', type=Path, default=None, help='输出 HTML 文件路径（默认同目录同名 .html）')
     parser.add_argument('--body-only', action='store_true', help='只输出 body 内部 HTML，不生成 `<html>` `<head>` 等外层结构')
     parser.add_argument('--code-separator', action='store_true', help='代码块使用经典手动分隔符模式（默认用纯 div+blockquote）')
+    parser.add_argument('--no-pause', action='store_true', help='处理完后不等待按键（用于脚本调用）')
 
     args = parser.parse_args(argv)
-    convert(
-        args.input, args.output,
-        body_only=args.body_only,
-        code_separator=args.code_separator,
-    )
+
+    _interactive = sys.stdin.isatty() and not args.no_pause
+
+    # ---- 拖拽/双击友好：如果没有提供输入文件，弹出交互式选择 ----
+    if args.input is None:
+        if not _interactive:
+            print("[错误] 未提供输入文件。用法: md2html.exe <文件路径>")
+            sys.exit(1)
+        print("=" * 60)
+        print("  Markdown → HTML 转换器")
+        print("=" * 60)
+        print()
+        print("  用法1: 将 .md 文件拖拽到此 exe 图标上自动转换")
+        print("  用法2: 命令行运行 md2html.exe yourfile.md")
+        print()
+        filepath = input("  请输入 Markdown 文件路径（或直接拖拽文件到此窗口）: ").strip().strip('"').strip("'")
+        if not filepath:
+            print("\n[错误] 未提供文件路径，按回车退出...", end='')
+            input()
+            sys.exit(1)
+        args.input = Path(filepath)
+
+    try:
+        convert(
+            args.input, args.output,
+            body_only=args.body_only,
+            code_separator=args.code_separator,
+        )
+    except FileNotFoundError as e:
+        print(f"\n[错误] {e}")
+        if _interactive:
+            print("\n按回车退出...", end='')
+            input()
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n[错误] 转换失败: {e}")
+        if _interactive:
+            print("\n按回车退出...", end='')
+            input()
+        sys.exit(1)
+
+    # ---- 拖拽友好：处理完后暂停，让用户看到结果 ----
+    if _interactive:
+        print()
+        print("转换完成！按回车退出...", end='')
+        input()
 
 
 if __name__ == '__main__':
